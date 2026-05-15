@@ -1,0 +1,2537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playmaker — Sandbox Mode</title>
+  <style>
+    :root {
+      --bg: #05070b;
+      --panel: #0d1118;
+      --panel2: #121722;
+      --line: rgba(255,255,255,0.96);
+      --muted: rgba(255,255,255,0.74);
+      --muted2: rgba(255,255,255,0.48);
+
+      --green-a: #77d66f;
+      --green-b: #25b700;
+      --red-a: #e50914;
+      --red-b: #b70711;
+      --blue-a: #1843ea;
+      --blue-b: #0b2eb8;
+      --gold: #ffd54a;
+      --danger: #f4475d;
+      --success: #43d17f;
+
+      --cell: 64px;
+      --rows: 15;
+      --cols: 8;
+
+      /* exact area rules */
+      /* player piece area = 1/4 square area => diameter = side / sqrt(pi) */
+      --piece-diam: calc(var(--cell) * 0.56419);
+      /* ball area = 1/8 square area => diameter = side / sqrt(2pi) */
+      --ball-diam: calc(var(--cell) * 0.39894);
+
+      --shadow: 0 24px 70px rgba(0,0,0,0.35);
+      --radius: 22px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(0,153,255,.10), transparent 25%),
+        radial-gradient(circle at top right, rgba(132,0,255,.12), transparent 28%),
+        linear-gradient(180deg, #070b12 0%, #04060a 100%);
+      color: #fff;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      user-select: none;
+    }
+
+    body { padding: 18px; }
+
+    .app {
+      max-width: 1680px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px minmax(0,1fr) 320px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .sidebar {
+      padding: 16px;
+      position: sticky;
+      top: 18px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .brand-mark {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #161b26, #0a0f17);
+      border: 1px solid rgba(255,255,255,.08);
+      display: grid;
+      place-items: center;
+      font-size: 23px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+      flex: 0 0 auto;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1;
+      letter-spacing: .2px;
+    }
+
+    .brand p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .section {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255,255,255,.08);
+    }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1.1px;
+      color: var(--muted2);
+      margin-bottom: 12px;
+      font-weight: 800;
+    }
+
+    .status-card {
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.018));
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 12px;
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .status-row:last-child { margin-bottom: 0; }
+
+    .label { color: var(--muted); }
+    .value { font-weight: 800; text-align: right; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      cursor: pointer;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-weight: 800;
+      font-size: 14px;
+      transition: transform .14s ease, opacity .14s ease, background .14s ease, border-color .14s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #fff, #d7dce6);
+      color: #0d1220;
+    }
+
+    .btn-secondary {
+      background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #ff667a, #d30f27);
+      color: #fff;
+    }
+
+    .btn-active {
+      background: linear-gradient(135deg, #ffe082, #ffc72d);
+      color: #181818;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+
+    .small-help {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .tray {
+      display: grid;
+      gap: 10px;
+    }
+
+    .tray-piece {
+      background: rgba(255,255,255,.035);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      cursor: grab;
+      transition: background .14s ease, border-color .14s ease, transform .14s ease;
+    }
+
+    .tray-piece:hover {
+      background: rgba(255,255,255,.05);
+      border-color: rgba(255,255,255,.12);
+      transform: translateY(-1px);
+    }
+
+    .tray-piece.active {
+      border-color: rgba(255,213,74,.75);
+      box-shadow: inset 0 0 0 2px rgba(255,213,74,.35);
+      background: rgba(255,213,74,.07);
+    }
+
+    .tray-piece:active { cursor: grabbing; }
+
+    .tray-piece-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .mini-piece {
+      width: 30px;
+      height: 30px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      font-weight: 900;
+      color: #fff;
+      border: 2px solid rgba(0,0,0,.25);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+      flex: 0 0 auto;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mini-piece::after {
+      content: "";
+      position: absolute;
+      inset: 12%;
+      border-radius: 999px;
+      border: 2px solid rgba(0,0,0,.34);
+    }
+
+    .mini-label {
+      position: relative;
+      z-index: 1;
+    }
+
+    .red {
+      background: radial-gradient(circle at 30% 30%, var(--red-a), var(--red-b));
+    }
+
+    .blue {
+      background: radial-gradient(circle at 30% 30%, var(--blue-a), var(--blue-b));
+    }
+
+    .tray-title {
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .tray-sub {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .tray-badge {
+      padding: 7px 10px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .preset-tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0,1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .preset-tab {
+      padding: 10px 8px;
+      font-size: 12px;
+      font-weight: 900;
+      border-radius: 10px;
+      background: rgba(255,255,255,.05);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .preset-tab.active {
+      background: linear-gradient(135deg, #ffe082, #ffc72d);
+      color: #181818;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 8px;
+    }
+
+    .preset-btn {
+      padding: 10px 10px;
+      font-size: 12px;
+      font-weight: 900;
+      border-radius: 10px;
+      background: rgba(255,255,255,.05);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.08);
+      text-align: center;
+      min-height: 46px;
+    }
+
+    .preset-btn:hover {
+      border-color: rgba(255,255,255,.14);
+    }
+
+    .main {
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .topbar h2 {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.06;
+    }
+
+    .topbar p {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      max-width: 900px;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .board-shell {
+      background: linear-gradient(180deg, #030406, #090c12);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.08);
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .board-wrap {
+      min-width: fit-content;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 4px;
+    }
+
+    .board-stage {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      justify-items: center;
+    }
+
+    .ball-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 2px;
+    }
+
+    .toolbar-note {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .board-frame {
+      position: relative;
+      background: #000;
+      padding: 26px 28px;
+      border-radius: 18px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+    }
+
+    .logo-text {
+      position: absolute;
+      top: 6px;
+      left: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #fff;
+      font-weight: 900;
+      letter-spacing: .5px;
+      font-size: 15px;
+      opacity: .95;
+      pointer-events: none;
+    }
+
+    .logo-bottom {
+      position: absolute;
+      right: 18px;
+      bottom: 6px;
+      color: #fff;
+      font-weight: 900;
+      letter-spacing: .5px;
+      font-size: 15px;
+      opacity: .92;
+      transform: rotate(180deg);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .field {
+      position: relative;
+      width: calc(var(--cell) * var(--cols));
+      height: calc(var(--cell) * var(--rows));
+      border: 6px solid rgba(255,255,255,.98);
+      overflow: hidden;
+      box-shadow: 0 30px 60px rgba(0,0,0,.36);
+      touch-action: none;
+      user-select: none;
+    }
+
+    .grid {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(var(--cols), 1fr);
+      grid-template-rows: repeat(var(--rows), 1fr);
+      z-index: 1;
+    }
+
+    .cell {
+      position: relative;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+
+    .cell.a {
+      background:
+        radial-gradient(circle at 18% 30%, rgba(0,0,0,.06), transparent 32%),
+        radial-gradient(circle at 75% 75%, rgba(0,0,0,.05), transparent 30%),
+        linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.02)),
+        var(--green-a);
+    }
+
+    .cell.b {
+      background:
+        radial-gradient(circle at 22% 35%, rgba(0,0,0,.08), transparent 28%),
+        radial-gradient(circle at 70% 65%, rgba(0,0,0,.06), transparent 30%),
+        linear-gradient(180deg, rgba(255,255,255,.01), rgba(0,0,0,.03)),
+        var(--green-b);
+    }
+
+    .cell.drop-preview {
+      box-shadow: inset 0 0 0 3px rgba(255,213,74,.96);
+      z-index: 2;
+    }
+
+    .slot-preview {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      background: var(--gold);
+      transform: translate(-50%, -50%);
+      z-index: 11;
+      pointer-events: none;
+      box-shadow: 0 0 0 3px rgba(0,0,0,.25);
+      display: none;
+    }
+
+    .lines {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .arrows-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      pointer-events: none;
+      overflow: visible;
+    }
+
+    .pieces-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .piece {
+      position: absolute;
+      width: var(--piece-diam);
+      height: var(--piece-diam);
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 900;
+      font-size: calc(var(--piece-diam) * .34);
+      letter-spacing: .3px;
+      border: 3px solid rgba(0,0,0,.24);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.18),
+        0 8px 20px rgba(0,0,0,.28);
+      transform: translate(-50%,-50%);
+      pointer-events: auto;
+      cursor: grab;
+      user-select: none;
+      overflow: hidden;
+    }
+
+    .piece:active { cursor: grabbing; }
+
+    .piece.selected {
+      outline: 4px solid rgba(255,213,74,.98);
+      outline-offset: 2px;
+      z-index: 9;
+    }
+
+    .piece-inner-ring {
+      position: absolute;
+      inset: 12%;
+      border-radius: 999px;
+      border: 2px solid rgba(0,0,0,.34);
+      pointer-events: none;
+    }
+
+    .piece-label {
+      position: relative;
+      z-index: 1;
+      line-height: 1;
+    }
+
+    .piece-number-badge {
+      position: absolute;
+      right: 6%;
+      bottom: 5%;
+      min-width: calc(var(--piece-diam) * .24);
+      height: calc(var(--piece-diam) * .24);
+      padding: 0 4px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.95);
+      color: #111;
+      font-size: calc(var(--piece-diam) * .16);
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0,0,0,.28);
+      z-index: 2;
+      line-height: 1;
+    }
+
+    .ball-token,
+    .ball-toolbar-token,
+    .drag-ghost.ball {
+      width: var(--ball-diam);
+      height: var(--ball-diam);
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 50% 50%, #fff 0 58%, transparent 59%),
+        radial-gradient(circle at 30% 28%, #000 0 12%, transparent 13%),
+        radial-gradient(circle at 73% 30%, #000 0 11%, transparent 12%),
+        radial-gradient(circle at 27% 74%, #000 0 11%, transparent 12%),
+        radial-gradient(circle at 74% 73%, #000 0 11%, transparent 12%),
+        radial-gradient(circle at 50% 52%, #000 0 16%, transparent 17%),
+        #fff;
+      border: 2px solid rgba(0,0,0,.22);
+      box-shadow: 0 5px 12px rgba(0,0,0,.26);
+    }
+
+    .ball-token {
+      position: absolute;
+      transform: translate(-50%,-50%);
+      z-index: 7;
+      pointer-events: auto;
+      cursor: grab;
+    }
+
+    .ball-toolbar-token {
+      cursor: grab;
+      flex: 0 0 auto;
+    }
+
+    .ball-toolbar-token.active {
+      outline: 3px solid rgba(255,213,74,.95);
+      outline-offset: 2px;
+      border-radius: 999px;
+    }
+
+    .board-meta {
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .meta-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      font-size: 12px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .chip-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    .dot-red { background: linear-gradient(135deg,var(--red-a),var(--red-b)); }
+    .dot-blue { background: linear-gradient(135deg,var(--blue-a),var(--blue-b)); }
+    .dot-gold { background: linear-gradient(135deg,#ffe591,#ffc72d); }
+
+    .history-text {
+      color: var(--muted2);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-top: 12px;
+      text-align: center;
+      max-width: 860px;
+    }
+
+    .drag-ghost {
+      position: fixed;
+      left: 0;
+      top: 0;
+      transform: translate(-50%,-50%);
+      pointer-events: none;
+      z-index: 9999;
+      opacity: .95;
+    }
+
+    .drag-ghost.piece {
+      width: var(--piece-diam);
+      height: var(--piece-diam);
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 900;
+      font-size: calc(var(--piece-diam) * .34);
+      border: 3px solid rgba(0,0,0,.24);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.18),
+        0 8px 20px rgba(0,0,0,.28);
+      overflow: hidden;
+    }
+
+    .drag-ghost .piece-inner-ring { inset: 12%; }
+
+    .ghost-invalid {
+      filter: grayscale(.25) brightness(.8);
+      opacity: .72;
+    }
+
+    .footer-note {
+      color: var(--muted2);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-top: 10px;
+    }
+
+    .editor-popover {
+      position: fixed;
+      z-index: 10020;
+      width: 290px;
+      background: linear-gradient(180deg, rgba(15,18,25,.98), rgba(8,10,14,.98));
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 16px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.35);
+      padding: 14px;
+      display: none;
+    }
+
+    .editor-popover.open { display: block; }
+
+    .editor-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-weight: 900;
+      font-size: 14px;
+    }
+
+    .editor-head .team-chip {
+      padding: 5px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+      color: white;
+    }
+
+    .editor-field {
+      margin-bottom: 10px;
+    }
+
+    .editor-field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .editor-field input[type="text"],
+    .editor-field input[type="number"] {
+      width: 100%;
+      background: #0a0d13;
+      color: #fff;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .editor-field input:focus {
+      border-color: rgba(255,255,255,.22);
+    }
+
+    .check-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+
+    .check-row input {
+      margin-top: 2px;
+      transform: scale(1.1);
+    }
+
+    .check-row div {
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .editor-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .name-tooltip {
+      position: fixed;
+      z-index: 10030;
+      pointer-events: none;
+      display: none;
+      padding: 7px 10px;
+      border-radius: 999px;
+      color: white;
+      font-size: 12px;
+      font-weight: 900;
+      box-shadow: 0 10px 24px rgba(0,0,0,.25);
+      white-space: nowrap;
+    }
+
+    .touch-note {
+      color: var(--muted2);
+      font-size: 12px;
+      line-height: 1.55;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 1350px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+    }
+
+    @media (max-width: 900px) {
+      .controls {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 740px) {
+      :root { --cell: 44px; }
+      body { padding: 12px; }
+      .main, .sidebar { padding: 14px; }
+      .topbar h2 { font-size: 24px; }
+      .board-shell { padding: 12px; }
+      .board-frame { padding: 22px 18px; }
+      .logo-text, .logo-bottom { font-size: 13px; }
+      .controls { grid-template-columns: 1fr; }
+      .preset-grid { grid-template-columns: 1fr 1fr; }
+      .editor-popover {
+        width: calc(100vw - 24px);
+        max-width: 320px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="panel sidebar">
+      <div class="brand">
+        <div class="brand-mark">♞</div>
+        <div>
+          <h1>Playmaker</h1>
+          <p>Digital tactics sandbox.</p>
+        </div>
+      </div>
+
+      <div class="section" style="margin-top:8px;padding-top:0;border-top:none;">
+        <div class="section-title">Sandbox Status</div>
+        <div class="status-card">
+          <div class="status-row">
+            <span class="label">Format</span>
+            <span class="value" id="formatText">11v11</span>
+          </div>
+          <div class="status-row">
+            <span class="label">Selected</span>
+            <span class="value" id="selectedText">None</span>
+          </div>
+          <div class="status-row">
+            <span class="label">Ball</span>
+            <span class="value" id="ballText">Off field</span>
+          </div>
+          <div class="status-row">
+            <span class="label">Armed</span>
+            <span class="value" id="armedText">None</span>
+          </div>
+          <div class="status-row">
+            <span class="label">History</span>
+            <span class="value" id="historyText">1 / 1</span>
+          </div>
+          <div class="status-row">
+            <span class="label">Arrows</span>
+            <span class="value" id="arrowText">0</span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button class="btn-secondary" id="undoBtn">Undo</button>
+          <button class="btn-secondary" id="redoBtn">Redo</button>
+          <button class="btn-secondary" id="editSelectedBtn">Edit Selected</button>
+          <button class="btn-secondary" id="clearSelectionBtn">Clear Selection</button>
+          <button class="btn-secondary" id="clearArmedBtn">Clear Armed</button>
+          <button class="btn-secondary" id="clearArrowsBtn">Clear Arrows</button>
+          <button class="btn-secondary" id="arrowModeBtn">Tap Arrow Mode</button>
+          <button class="btn-danger" id="resetBtn">Reset Sandbox</button>
+        </div>
+
+        <div class="small-help">
+          Desktop: left-drag pieces to move, right-drag from a piece to draw arrows, and double right-click a piece to edit its name and number.
+          Mobile: tap a tray piece to arm it, then tap the field to place it. Tap a placed piece, then tap a square to move it. Turn on Tap Arrow Mode to create arrows without right-click.
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Red Team Presets</div>
+        <div class="status-card" style="margin-bottom:12px;">
+          <div class="status-row">
+            <span class="label">On Field</span>
+            <span class="value" id="redCount">0 / 11</span>
+          </div>
+        </div>
+        <div class="preset-tabs" id="redTabs"></div>
+        <div class="preset-grid" id="redPresets"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Red Team Tray</div>
+        <div class="tray" id="redTray"></div>
+      </div>
+    </aside>
+
+    <main class="panel main">
+      <div class="topbar">
+        <div>
+          <h2>Playmaker — Sandbox Mode</h2>
+          <p>
+            Playmaker is a digital soccer tactics board and strategy training tool built to make soccer IQ more visible and more trainable.
+            It is meant for coaches, players, and teams to map out spacing, build-up patterns, passing options, defensive shape, movement ideas,
+            and game plans in an interactive way. This sandbox is the coaching foundation: drag players onto the field, place them precisely inside
+            each square, attach or free-place the ball with fine control, draw arrows to teach runs and patterns, and quickly switch between common
+            7v7, 9v9, and 11v11 formation presets.
+          </p>
+        </div>
+        <div class="top-actions">
+          <div class="badge">Coach Board</div>
+          <div class="badge">Touch Friendly</div>
+        </div>
+      </div>
+
+      <div class="board-shell">
+        <div class="board-stage">
+          <div class="ball-toolbar">
+            <div class="ball-toolbar-token" id="ballHome" title="Drag or tap to arm the ball"></div>
+            <div class="toolbar-note">
+              Drag the ball, or tap it to arm ball placement. Empty squares give 17 anchor options. Dropping onto a player attaches the ball to one of 8 positions around that piece.
+            </div>
+          </div>
+
+          <div class="board-frame">
+            <div class="logo-text"><span>♞</span><span>PLAYMAKER</span></div>
+            <div class="logo-bottom"><span>PLAYMAKER</span><span>♞</span></div>
+
+            <div class="field" id="field">
+              <div class="grid" id="grid"></div>
+
+              <svg class="lines" viewBox="0 0 800 1500" preserveAspectRatio="none" aria-hidden="true">
+                <line x1="0" y1="750" x2="800" y2="750" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <circle cx="400" cy="750" r="82" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <circle cx="400" cy="750" r="6" fill="rgba(255,255,255,0.98)"/>
+
+                <rect x="190" y="0" width="420" height="210" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <rect x="290" y="0" width="220" height="95" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <path d="M 315 210 A 85 85 0 0 0 485 210" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <circle cx="400" cy="122" r="6" fill="rgba(255,255,255,0.98)"/>
+                <rect x="335" y="-24" width="130" height="24" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+
+                <rect x="190" y="1290" width="420" height="210" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <rect x="290" y="1405" width="220" height="95" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <path d="M 315 1290 A 85 85 0 0 1 485 1290" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+                <circle cx="400" cy="1378" r="6" fill="rgba(255,255,255,0.98)"/>
+                <rect x="335" y="1500" width="130" height="24" fill="none" stroke="rgba(255,255,255,0.98)" stroke-width="8"/>
+              </svg>
+
+              <svg class="arrows-layer" id="arrowsSvg" aria-hidden="true"></svg>
+              <div class="pieces-layer" id="piecesLayer"></div>
+              <div class="slot-preview" id="slotPreview"></div>
+            </div>
+          </div>
+
+          <div class="board-meta">
+            <div class="meta-group">
+              <div class="chip"><span class="chip-dot dot-red"></span>Red Team</div>
+              <div class="chip"><span class="chip-dot dot-blue"></span>Blue Team</div>
+              <div class="chip"><span class="chip-dot dot-gold"></span>Selected / Target Anchor</div>
+            </div>
+            <div class="meta-group">
+              <div class="chip">5 player anchors per square</div>
+              <div class="chip">17 free-ball anchors</div>
+            </div>
+          </div>
+
+          <div class="history-text">
+            Undo and Redo track adds, moves, deletes, preset applications, ball changes, number/name edits, and arrows. Mobile fallback is built in: tap to arm, tap to place, tap to move.
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="panel sidebar">
+      <div class="section" style="margin-top:8px;padding-top:0;border-top:none;">
+        <div class="section-title">Blue Team Presets</div>
+        <div class="status-card" style="margin-bottom:12px;">
+          <div class="status-row">
+            <span class="label">On Field</span>
+            <span class="value" id="blueCount">0 / 11</span>
+          </div>
+        </div>
+        <div class="preset-tabs" id="blueTabs"></div>
+        <div class="preset-grid" id="bluePresets"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Blue Team Tray</div>
+        <div class="tray" id="blueTray"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Notes</div>
+        <div class="small-help">
+          Double right-click a piece on desktop to edit it. On mobile, double tap a piece or use Edit Selected. A number can either replace the position text or sit in the bottom-right badge.
+        </div>
+        <div class="touch-note">
+          Tip: if you are on mobile and want to add pieces fast, tap a tray item, tap the board, then repeat. You do not need drag-and-drop to build a lineup.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="editor-popover" id="editorPopover">
+    <div class="editor-head">
+      <div id="editorTitle">Edit Player</div>
+      <div class="team-chip" id="editorTeamChip">TEAM</div>
+    </div>
+
+    <div class="editor-field">
+      <label for="playerNameInput">Update name</label>
+      <input type="text" id="playerNameInput" placeholder="Player name" maxlength="28" />
+    </div>
+
+    <div class="editor-field">
+      <label for="playerNumberInput">Update number</label>
+      <input type="number" id="playerNumberInput" placeholder="1 to 99" min="0" max="99" />
+    </div>
+
+    <label class="check-row">
+      <input type="checkbox" id="replaceTextCheckbox" />
+      <div>
+        Replace the position letters with the number. If unchecked, the position stays in the middle and the number goes in the bottom-right badge.
+      </div>
+    </label>
+
+    <div class="editor-actions">
+      <button class="btn-primary" id="saveEditorBtn">Save</button>
+      <button class="btn-secondary" id="closeEditorBtn">Close</button>
+    </div>
+  </div>
+
+  <div class="name-tooltip" id="nameTooltip"></div>
+
+  <script>
+    const POSITIONS = ["ST","LW","RW","CAM","CM","RM","LM","CDM","CB","LB","RB","GK"];
+    const ROWS = 15;
+    const COLS = 8;
+    const PIECE_FACTOR = 0.56419;
+    const BALL_FACTOR = 0.39894;
+
+    const FORMATS = ["7v7", "9v9", "11v11"];
+
+    const PRESETS = {
+      "7v7": {
+        "2-3-1": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"CB", row:11, col:2, slot:"c" },
+          { label:"CB", row:11, col:4, slot:"c" },
+          { label:"LM", row:8, col:1, slot:"c" },
+          { label:"CM", row:8, col:3, slot:"c" },
+          { label:"RM", row:8, col:5, slot:"c" },
+          { label:"ST", row:5, col:3, slot:"c" }
+        ],
+        "3-2-1": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:3, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"ST", row:5, col:3, slot:"c" }
+        ],
+        "3-1-2": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:3, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"CM", row:8, col:3, slot:"c" },
+          { label:"ST", row:5, col:2, slot:"c" },
+          { label:"ST", row:5, col:4, slot:"c" }
+        ],
+        "2-1-2-1": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"CB", row:11, col:2, slot:"c" },
+          { label:"CB", row:11, col:4, slot:"c" },
+          { label:"CDM", row:9, col:3, slot:"c" },
+          { label:"LW", row:7, col:2, slot:"c" },
+          { label:"RW", row:7, col:4, slot:"c" },
+          { label:"ST", row:4, col:3, slot:"c" }
+        ]
+      },
+      "9v9": {
+        "3-2-3": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:3, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"LW", row:5, col:1, slot:"c" },
+          { label:"ST", row:5, col:3, slot:"c" },
+          { label:"RW", row:5, col:5, slot:"c" }
+        ],
+        "3-3-2": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:3, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CDM", row:9, col:3, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"ST", row:5, col:2, slot:"c" },
+          { label:"ST", row:5, col:4, slot:"c" }
+        ],
+        "4-3-1": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:2, slot:"c" },
+          { label:"CB", row:11, col:4, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CDM", row:9, col:3, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"ST", row:5, col:3, slot:"c" }
+        ],
+        "2-4-2": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"CB", row:11, col:2, slot:"c" },
+          { label:"CB", row:11, col:4, slot:"c" },
+          { label:"LM", row:8, col:1, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"RM", row:8, col:5, slot:"c" },
+          { label:"ST", row:5, col:2, slot:"c" },
+          { label:"ST", row:5, col:4, slot:"c" }
+        ]
+      },
+      "11v11": {
+        "4-3-3": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:2, slot:"c" },
+          { label:"CB", row:11, col:4, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CDM", row:9, col:3, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"LW", row:5, col:1, slot:"c" },
+          { label:"ST", row:4, col:3, slot:"c" },
+          { label:"RW", row:5, col:5, slot:"c" }
+        ],
+        "4-5-1": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:2, slot:"c" },
+          { label:"CB", row:11, col:4, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"LM", row:8, col:1, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CDM", row:9, col:3, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"RM", row:8, col:5, slot:"c" },
+          { label:"ST", row:4, col:3, slot:"c" }
+        ],
+        "4-4-2": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"LB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:2, slot:"c" },
+          { label:"CB", row:11, col:4, slot:"c" },
+          { label:"RB", row:11, col:5, slot:"c" },
+          { label:"LM", row:8, col:1, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"RM", row:8, col:5, slot:"c" },
+          { label:"ST", row:5, col:2, slot:"c" },
+          { label:"ST", row:5, col:4, slot:"c" }
+        ],
+        "3-5-2": [
+          { label:"GK", row:14, col:3, slot:"c" },
+          { label:"CB", row:11, col:1, slot:"c" },
+          { label:"CB", row:11, col:3, slot:"c" },
+          { label:"CB", row:11, col:5, slot:"c" },
+          { label:"LM", row:8, col:1, slot:"c" },
+          { label:"CM", row:8, col:2, slot:"c" },
+          { label:"CDM", row:9, col:3, slot:"c" },
+          { label:"CM", row:8, col:4, slot:"c" },
+          { label:"RM", row:8, col:5, slot:"c" },
+          { label:"ST", row:5, col:2, slot:"c" },
+          { label:"ST", row:5, col:4, slot:"c" }
+        ]
+      }
+    };
+
+    const gridEl = document.getElementById("grid");
+    const fieldEl = document.getElementById("field");
+    const piecesLayerEl = document.getElementById("piecesLayer");
+    const arrowsSvgEl = document.getElementById("arrowsSvg");
+    const slotPreviewEl = document.getElementById("slotPreview");
+
+    const redTrayEl = document.getElementById("redTray");
+    const blueTrayEl = document.getElementById("blueTray");
+    const redTabsEl = document.getElementById("redTabs");
+    const blueTabsEl = document.getElementById("blueTabs");
+    const redPresetsEl = document.getElementById("redPresets");
+    const bluePresetsEl = document.getElementById("bluePresets");
+
+    const formatTextEl = document.getElementById("formatText");
+    const selectedTextEl = document.getElementById("selectedText");
+    const ballTextEl = document.getElementById("ballText");
+    const armedTextEl = document.getElementById("armedText");
+    const historyTextEl = document.getElementById("historyText");
+    const arrowTextEl = document.getElementById("arrowText");
+    const redCountEl = document.getElementById("redCount");
+    const blueCountEl = document.getElementById("blueCount");
+
+    const undoBtn = document.getElementById("undoBtn");
+    const redoBtn = document.getElementById("redoBtn");
+    const editSelectedBtn = document.getElementById("editSelectedBtn");
+    const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+    const clearArmedBtn = document.getElementById("clearArmedBtn");
+    const clearArrowsBtn = document.getElementById("clearArrowsBtn");
+    const arrowModeBtn = document.getElementById("arrowModeBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const ballHomeEl = document.getElementById("ballHome");
+
+    const editorPopoverEl = document.getElementById("editorPopover");
+    const editorTitleEl = document.getElementById("editorTitle");
+    const editorTeamChipEl = document.getElementById("editorTeamChip");
+    const playerNameInputEl = document.getElementById("playerNameInput");
+    const playerNumberInputEl = document.getElementById("playerNumberInput");
+    const replaceTextCheckboxEl = document.getElementById("replaceTextCheckbox");
+    const saveEditorBtn = document.getElementById("saveEditorBtn");
+    const closeEditorBtn = document.getElementById("closeEditorBtn");
+
+    const nameTooltipEl = document.getElementById("nameTooltip");
+
+    document.addEventListener("contextmenu", e => e.preventDefault());
+
+    const ui = {
+      drag: null,
+      dragGhost: null,
+      hoverCell: null,
+      hoverAnchor: null,
+      tempArrow: null,
+      suppressClicksUntil: 0,
+      recentTouchUntil: 0,
+      lastPieceTap: { id: null, time: 0 },
+      lastRightClick: { id: null, time: 0 },
+      armedTemplate: null,
+      armedBall: false,
+      arrowMode: false,
+      pendingArrowStart: null,
+      editorPieceId: null,
+      lastPointer: { x: 0, y: 0 }
+    };
+
+    function makeInitialState() {
+      return {
+        format: "11v11",
+        pieces: [],
+        ball: { mode: "off", row: null, col: null, anchor: null, pieceId: null, hold: null },
+        arrows: [],
+        nextPieceId: 1,
+        nextArrowId: 1,
+        selectedPieceId: null
+      };
+    }
+
+    let state = makeInitialState();
+    let history = [snapshot(state)];
+    let historyIndex = 0;
+
+    function snapshot(obj) {
+      return JSON.parse(JSON.stringify(obj));
+    }
+
+    function restoreFrom(snap) {
+      state = snapshot(snap);
+      closeEditor();
+      clearHover();
+      render();
+    }
+
+    function commit() {
+      history = history.slice(0, historyIndex + 1);
+      history.push(snapshot(state));
+      historyIndex = history.length - 1;
+      renderStatus();
+    }
+
+    function getMetrics() {
+      const rect = fieldEl.getBoundingClientRect();
+      const cellW = rect.width / COLS;
+      const cellH = rect.height / ROWS;
+      const s = Math.min(cellW, cellH);
+      const pieceRadius = s * PIECE_FACTOR / 2;
+      const ballRadius = s * BALL_FACTOR / 2;
+      return { rect, cellW, cellH, s, pieceRadius, ballRadius };
+    }
+
+    function squareCenter(row, col) {
+      const { cellW, cellH } = getMetrics();
+      return {
+        x: (col + 0.5) * cellW,
+        y: (row + 0.5) * cellH
+      };
+    }
+
+    function fieldPointFromClient(clientX, clientY) {
+      const { rect } = getMetrics();
+      return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function pointToCell(clientX, clientY) {
+      const { rect, cellW, cellH } = getMetrics();
+      const inside = clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+      if (!inside) return null;
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+      const col = Math.floor(x / cellW);
+      const row = Math.floor(y / cellH);
+      if (row < 0 || row >= ROWS || col < 0 || col >= COLS) return null;
+      return { row, col, x, y };
+    }
+
+    function normalizePoint(x, y) {
+      const { rect } = getMetrics();
+      return { x: x / rect.width, y: y / rect.height };
+    }
+
+    function denormalizePoint(nx, ny) {
+      const { rect } = getMetrics();
+      return { x: nx * rect.width, y: ny * rect.height };
+    }
+
+    function teamCount(team) {
+      return state.pieces.filter(p => p.team === team).length;
+    }
+
+    function getPiece(id) {
+      return state.pieces.find(p => p.id === id) || null;
+    }
+
+    function pieceName(piece) {
+      return `${piece.team === "red" ? "Red" : "Blue"} ${piece.label}`;
+    }
+
+    function isTouchContext() {
+      return Date.now() < ui.recentTouchUntil;
+    }
+
+    function getPieceSlotDefs() {
+      const { s, pieceRadius } = getMetrics();
+      const maxOffset = Math.max(0, s / 2 - pieceRadius - 2);
+      return [
+        { id: "c",  dx: 0,          dy: 0 },
+        { id: "nw", dx: -maxOffset, dy: -maxOffset },
+        { id: "ne", dx:  maxOffset, dy: -maxOffset },
+        { id: "sw", dx: -maxOffset, dy:  maxOffset },
+        { id: "se", dx:  maxOffset, dy:  maxOffset }
+      ];
+    }
+
+    function getFreeBallAnchorDefs() {
+      const { s, ballRadius } = getMetrics();
+      const range = Math.max(0, s / 2 - ballRadius - 2);
+      const steps = [-range, -range / 3, range / 3, range];
+      const defs = [{ id: "c", dx: 0, dy: 0 }];
+      let idx = 0;
+      for (const y of steps) {
+        for (const x of steps) {
+          defs.push({ id: `g${idx++}`, dx: x, dy: y });
+        }
+      }
+      return defs;
+    }
+
+    function getBallHoldDefs() {
+      const { pieceRadius, ballRadius } = getMetrics();
+      const dist = Math.max(0, pieceRadius + ballRadius - 1);
+      const diag = dist / Math.sqrt(2);
+      return [
+        { id: "n",  dx: 0,     dy: -dist },
+        { id: "s",  dx: 0,     dy:  dist },
+        { id: "e",  dx: dist,  dy: 0 },
+        { id: "w",  dx: -dist, dy: 0 },
+        { id: "ne", dx: diag,  dy: -diag },
+        { id: "nw", dx: -diag, dy: -diag },
+        { id: "se", dx: diag,  dy: diag },
+        { id: "sw", dx: -diag, dy: diag }
+      ];
+    }
+
+    function slotOccupied(row, col, slot, ignorePieceId = null) {
+      return state.pieces.some(p => p.id !== ignorePieceId && p.row === row && p.col === col && p.slot === slot);
+    }
+
+    function pieceCenter(piece) {
+      const center = squareCenter(piece.row, piece.col);
+      const slot = getPieceSlotDefs().find(s => s.id === piece.slot) || getPieceSlotDefs()[0];
+      return { x: center.x + slot.dx, y: center.y + slot.dy };
+    }
+
+    function getNearestAvailablePieceSlot(row, col, clientX, clientY, ignorePieceId = null) {
+      const cell = pointToCell(clientX, clientY);
+      if (!cell) return null;
+      const defs = getPieceSlotDefs();
+      const center = squareCenter(row, col);
+      const ranked = defs
+        .map(def => ({
+          ...def,
+          dist: Math.hypot((center.x + def.dx) - cell.x, (center.y + def.dy) - cell.y)
+        }))
+        .sort((a, b) => a.dist - b.dist);
+      for (const def of ranked) {
+        if (!slotOccupied(row, col, def.id, ignorePieceId)) return def;
+      }
+      return null;
+    }
+
+    function getNearestFreeBallAnchor(row, col, clientX, clientY) {
+      const cell = pointToCell(clientX, clientY);
+      if (!cell) return null;
+      const defs = getFreeBallAnchorDefs();
+      const center = squareCenter(row, col);
+      return defs
+        .map(def => ({
+          ...def,
+          dist: Math.hypot((center.x + def.dx) - cell.x, (center.y + def.dy) - cell.y)
+        }))
+        .sort((a, b) => a.dist - b.dist)[0] || null;
+    }
+
+    function getNearestPieceInSquare(row, col, clientX, clientY) {
+      const sameSquare = state.pieces.filter(p => p.row === row && p.col === col);
+      if (!sameSquare.length) return null;
+      const fp = fieldPointFromClient(clientX, clientY);
+      return sameSquare
+        .map(piece => {
+          const c = pieceCenter(piece);
+          return { piece, dist: Math.hypot(c.x - fp.x, c.y - fp.y) };
+        })
+        .sort((a, b) => a.dist - b.dist)[0].piece;
+    }
+
+    function getNearestHoldAnchor(piece, clientX, clientY) {
+      const fp = fieldPointFromClient(clientX, clientY);
+      const pCenter = pieceCenter(piece);
+      const defs = getBallHoldDefs();
+      return defs
+        .map(def => ({
+          ...def,
+          dist: Math.hypot((pCenter.x + def.dx) - fp.x, (pCenter.y + def.dy) - fp.y)
+        }))
+        .sort((a, b) => a.dist - b.dist)[0] || null;
+    }
+
+    function ballCenter() {
+      if (state.ball.mode === "off") return null;
+
+      if (state.ball.mode === "free") {
+        const center = squareCenter(state.ball.row, state.ball.col);
+        const def = getFreeBallAnchorDefs().find(a => a.id === state.ball.anchor) || getFreeBallAnchorDefs()[0];
+        return { x: center.x + def.dx, y: center.y + def.dy };
+      }
+
+      if (state.ball.mode === "attached") {
+        const piece = getPiece(state.ball.pieceId);
+        if (!piece) return null;
+        const pCenter = pieceCenter(piece);
+        const def = getBallHoldDefs().find(a => a.id === state.ball.hold) || getBallHoldDefs()[0];
+        return { x: pCenter.x + def.dx, y: pCenter.y + def.dy };
+      }
+
+      return null;
+    }
+
+    function createGrid() {
+      gridEl.innerHTML = "";
+      for (let row = 0; row < ROWS; row++) {
+        for (let col = 0; col < COLS; col++) {
+          const cell = document.createElement("div");
+          cell.className = `cell ${(row + col) % 2 === 0 ? "a" : "b"}`;
+          gridEl.appendChild(cell);
+        }
+      }
+    }
+
+    function clearHover() {
+      ui.hoverCell = null;
+      ui.hoverAnchor = null;
+      renderHover();
+    }
+
+    function renderHover() {
+      [...gridEl.children].forEach(c => c.classList.remove("drop-preview"));
+      slotPreviewEl.style.display = "none";
+
+      if (!ui.hoverCell) return;
+      const idx = ui.hoverCell.row * COLS + ui.hoverCell.col;
+      const cell = gridEl.children[idx];
+      if (cell) cell.classList.add("drop-preview");
+
+      if (ui.hoverAnchor) {
+        slotPreviewEl.style.display = "block";
+        slotPreviewEl.style.left = ui.hoverAnchor.x + "px";
+        slotPreviewEl.style.top = ui.hoverAnchor.y + "px";
+      }
+    }
+
+    function makePieceGhost(team, label, number = "", replaceLabelWithNumber = false) {
+      const shown = replaceLabelWithNumber && number ? number : label;
+      const badge = !replaceLabelWithNumber && number
+        ? `<div class="piece-number-badge">${number}</div>`
+        : "";
+
+      const ghost = document.createElement("div");
+      ghost.className = `drag-ghost piece ${team}`;
+      ghost.innerHTML = `
+        <div class="piece-inner-ring"></div>
+        <div class="piece-label">${shown}</div>
+        ${badge}
+      `;
+      document.body.appendChild(ghost);
+      return ghost;
+    }
+
+    function makeBallGhost() {
+      const ghost = document.createElement("div");
+      ghost.className = "drag-ghost ball";
+      document.body.appendChild(ghost);
+      return ghost;
+    }
+
+    function moveGhost(x, y) {
+      if (!ui.dragGhost) return;
+      ui.dragGhost.style.left = x + "px";
+      ui.dragGhost.style.top = y + "px";
+    }
+
+    function renderTrays() {
+      renderTray("red", redTrayEl);
+      renderTray("blue", blueTrayEl);
+    }
+
+    function renderTray(team, el) {
+      el.innerHTML = "";
+      POSITIONS.forEach(label => {
+        const isActive = ui.armedTemplate && ui.armedTemplate.team === team && ui.armedTemplate.label === label;
+
+        const row = document.createElement("div");
+        row.className = `tray-piece${isActive ? " active" : ""}`;
+        row.innerHTML = `
+          <div class="tray-piece-left">
+            <div class="mini-piece ${team}"><span class="mini-label">${label}</span></div>
+            <div>
+              <div class="tray-title">${label}</div>
+              <div class="tray-sub">${team === "red" ? "Red" : "Blue"} template</div>
+            </div>
+          </div>
+          <div class="tray-badge">${isActive ? "Armed" : "Tap / Drag"}</div>
+        `;
+
+        row.addEventListener("click", () => {
+          if (Date.now() < ui.suppressClicksUntil) return;
+          closeEditor();
+          ui.armedBall = false;
+          ui.arrowMode = false;
+          ui.pendingArrowStart = null;
+          ui.armedTemplate =
+            ui.armedTemplate && ui.armedTemplate.team === team && ui.armedTemplate.label === label
+              ? null
+              : { team, label };
+          render();
+        });
+
+        row.addEventListener("mousedown", e => {
+          if (e.button !== 0) return;
+          closeEditor();
+          ui.drag = {
+            type: "template",
+            team,
+            label,
+            startX: e.clientX,
+            startY: e.clientY,
+            moved: false
+          };
+          window.addEventListener("mousemove", onMouseMove);
+          window.addEventListener("mouseup", onMouseUp, { once: true });
+        });
+
+        el.appendChild(row);
+      });
+    }
+
+    function renderPresetSide(team, tabsEl, presetsEl) {
+      tabsEl.innerHTML = "";
+      presetsEl.innerHTML = "";
+
+      FORMATS.forEach(format => {
+        const btn = document.createElement("button");
+        btn.className = `preset-tab${state.format === format ? " active" : ""}`;
+        btn.textContent = format;
+        btn.addEventListener("click", () => {
+          state.format = format;
+          render();
+        });
+        tabsEl.appendChild(btn);
+      });
+
+      Object.keys(PRESETS[state.format]).forEach(name => {
+        const btn = document.createElement("button");
+        btn.className = "preset-btn";
+        btn.textContent = name;
+        btn.addEventListener("click", () => {
+          applyPreset(team, name);
+        });
+        presetsEl.appendChild(btn);
+      });
+    }
+
+    function renderPresets() {
+      renderPresetSide("red", redTabsEl, redPresetsEl);
+      renderPresetSide("blue", blueTabsEl, bluePresetsEl);
+    }
+
+    function renderPieces() {
+      piecesLayerEl.innerHTML = "";
+
+      state.pieces.forEach(piece => {
+        const shown = piece.replaceLabelWithNumber && piece.number ? piece.number : piece.label;
+        const numberBadge = !piece.replaceLabelWithNumber && piece.number
+          ? `<div class="piece-number-badge">${piece.number}</div>`
+          : "";
+
+        const el = document.createElement("div");
+        el.className = `piece ${piece.team}${state.selectedPieceId === piece.id ? " selected" : ""}`;
+        const pos = pieceCenter(piece);
+        el.style.left = pos.x + "px";
+        el.style.top = pos.y + "px";
+        el.innerHTML = `
+          <div class="piece-inner-ring"></div>
+          <div class="piece-label">${shown}</div>
+          ${numberBadge}
+        `;
+
+        el.addEventListener("mousedown", e => {
+          e.preventDefault();
+          ui.lastPointer = { x: e.clientX, y: e.clientY };
+
+          if (e.button === 0) {
+            ui.drag = {
+              type: "piece-left",
+              pieceId: piece.id,
+              startX: e.clientX,
+              startY: e.clientY,
+              moved: false
+            };
+            window.addEventListener("mousemove", onMouseMove);
+            window.addEventListener("mouseup", onMouseUp, { once: true });
+          } else if (e.button === 2) {
+            ui.drag = {
+              type: "piece-right",
+              pieceId: piece.id,
+              startX: e.clientX,
+              startY: e.clientY,
+              moved: false
+            };
+            window.addEventListener("mousemove", onMouseMove);
+            window.addEventListener("mouseup", onMouseUp, { once: true });
+          }
+        });
+
+        el.addEventListener("click", e => {
+          if (Date.now() < ui.suppressClicksUntil) return;
+          handlePieceTap(piece, e.clientX || ui.lastPointer.x, e.clientY || ui.lastPointer.y);
+        });
+
+        el.addEventListener("mousemove", e => {
+          if (piece.name) {
+            showNameTooltip(piece, e.clientX, e.clientY);
+          }
+        });
+
+        el.addEventListener("mouseleave", hideNameTooltip);
+
+        piecesLayerEl.appendChild(el);
+      });
+
+      renderBall();
+    }
+
+    function renderBall() {
+      const old = document.querySelector(".ball-token");
+      if (old) old.remove();
+
+      if (state.ball.mode === "off") return;
+      const c = ballCenter();
+      if (!c) return;
+
+      const ball = document.createElement("div");
+      ball.className = "ball-token";
+      ball.style.left = c.x + "px";
+      ball.style.top = c.y + "px";
+
+      ball.addEventListener("mousedown", e => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        ui.drag = {
+          type: "ball",
+          startX: e.clientX,
+          startY: e.clientY,
+          moved: false
+        };
+        window.addEventListener("mousemove", onMouseMove);
+        window.addEventListener("mouseup", onMouseUp, { once: true });
+      });
+
+      ball.addEventListener("click", () => {
+        if (Date.now() < ui.suppressClicksUntil) return;
+        closeEditor();
+        ui.armedTemplate = null;
+        ui.arrowMode = false;
+        ui.pendingArrowStart = null;
+        ui.armedBall = true;
+        render();
+      });
+
+      piecesLayerEl.appendChild(ball);
+    }
+
+    function renderArrows() {
+      const { rect } = getMetrics();
+      arrowsSvgEl.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+      arrowsSvgEl.innerHTML = `
+        <defs>
+          <marker id="arrowhead" markerWidth="14" markerHeight="14" refX="11" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L14,7 L0,14 L4,7 Z" fill="#ffd54a"></path>
+          </marker>
+        </defs>
+      `;
+
+      const makeLine = (x1, y1, x2, y2, dashed = false) => {
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", x1);
+        line.setAttribute("y1", y1);
+        line.setAttribute("x2", x2);
+        line.setAttribute("y2", y2);
+        line.setAttribute("stroke", "#ffd54a");
+        line.setAttribute("stroke-width", "5");
+        line.setAttribute("stroke-linecap", "round");
+        line.setAttribute("marker-end", "url(#arrowhead)");
+        if (dashed) line.setAttribute("stroke-dasharray", "10 8");
+        return line;
+      };
+
+      state.arrows.forEach(arrow => {
+        const start = denormalizePoint(arrow.start.x, arrow.start.y);
+        const end = denormalizePoint(arrow.end.x, arrow.end.y);
+        arrowsSvgEl.appendChild(makeLine(start.x, start.y, end.x, end.y, false));
+      });
+
+      if (ui.tempArrow) {
+        const start = denormalizePoint(ui.tempArrow.start.x, ui.tempArrow.start.y);
+        const end = denormalizePoint(ui.tempArrow.end.x, ui.tempArrow.end.y);
+        arrowsSvgEl.appendChild(makeLine(start.x, start.y, end.x, end.y, true));
+      }
+    }
+
+    function renderStatus() {
+      formatTextEl.textContent = state.format;
+      redCountEl.textContent = `${teamCount("red")} / 11`;
+      blueCountEl.textContent = `${teamCount("blue")} / 11`;
+
+      const selected = state.selectedPieceId ? getPiece(state.selectedPieceId) : null;
+      selectedTextEl.textContent = selected
+        ? `${pieceName(selected)} (${selected.row + 1}, ${selected.col + 1}, ${selected.slot.toUpperCase()})`
+        : "None";
+
+      if (state.ball.mode === "off") {
+        ballTextEl.textContent = "Off field";
+      } else if (state.ball.mode === "free") {
+        ballTextEl.textContent = `Free — R${state.ball.row + 1} C${state.ball.col + 1} ${state.ball.anchor.toUpperCase()}`;
+      } else {
+        const p = getPiece(state.ball.pieceId);
+        ballTextEl.textContent = p ? `${pieceName(p)} ${state.ball.hold.toUpperCase()}` : "Off field";
+      }
+
+      const armedParts = [];
+      if (ui.armedTemplate) armedParts.push(`${ui.armedTemplate.team === "red" ? "Red" : "Blue"} ${ui.armedTemplate.label}`);
+      if (ui.armedBall) armedParts.push("Ball");
+      if (ui.arrowMode) armedParts.push(ui.pendingArrowStart ? "Arrow End Point" : "Arrow Start");
+      armedTextEl.textContent = armedParts.length ? armedParts.join(" + ") : "None";
+
+      historyTextEl.textContent = `${historyIndex + 1} / ${history.length}`;
+      arrowTextEl.textContent = String(state.arrows.length);
+
+      undoBtn.disabled = historyIndex === 0;
+      redoBtn.disabled = historyIndex === history.length - 1;
+      undoBtn.style.opacity = historyIndex === 0 ? 0.5 : 1;
+      redoBtn.style.opacity = historyIndex === history.length - 1 ? 0.5 : 1;
+
+      arrowModeBtn.className = ui.arrowMode ? "btn-active" : "btn-secondary";
+      arrowModeBtn.textContent = ui.arrowMode
+        ? (ui.pendingArrowStart ? "Tap Arrow: End Point" : "Tap Arrow Mode: ON")
+        : "Tap Arrow Mode";
+
+      ballHomeEl.classList.toggle("active", ui.armedBall);
+      editSelectedBtn.style.opacity = selected ? 1 : 0.6;
+    }
+
+    function render() {
+      renderTrays();
+      renderPresets();
+      renderPieces();
+      renderArrows();
+      renderStatus();
+      renderHover();
+    }
+
+    function cleanupDrag() {
+      if (ui.dragGhost) ui.dragGhost.remove();
+      ui.dragGhost = null;
+      ui.drag = null;
+      ui.tempArrow = null;
+      clearHover();
+      render();
+    }
+
+    function closeEditor() {
+      editorPopoverEl.classList.remove("open");
+      ui.editorPieceId = null;
+    }
+
+    function openEditorForPiece(piece, clientX, clientY) {
+      state.selectedPieceId = piece.id;
+      ui.editorPieceId = piece.id;
+
+      editorTitleEl.textContent = `Edit ${pieceName(piece)}`;
+      editorTeamChipEl.textContent = piece.team === "red" ? "RED" : "BLUE";
+      editorTeamChipEl.style.background = piece.team === "red"
+        ? "linear-gradient(135deg, var(--red-a), var(--red-b))"
+        : "linear-gradient(135deg, var(--blue-a), var(--blue-b))";
+
+      playerNameInputEl.value = piece.name || "";
+      playerNumberInputEl.value = piece.number || "";
+      replaceTextCheckboxEl.checked = !!piece.replaceLabelWithNumber;
+
+      editorPopoverEl.classList.add("open");
+
+      const width = 290;
+      const height = 250;
+      const x = Math.min(window.innerWidth - width - 12, Math.max(12, clientX + 12));
+      const y = Math.min(window.innerHeight - height - 12, Math.max(12, clientY + 12));
+      editorPopoverEl.style.left = x + "px";
+      editorPopoverEl.style.top = y + "px";
+
+      render();
+    }
+
+    function saveEditor() {
+      const piece = getPiece(ui.editorPieceId);
+      if (!piece) return;
+
+      const name = playerNameInputEl.value.trim();
+      let number = playerNumberInputEl.value.trim();
+
+      if (number === "0") number = "";
+      if (number) number = String(Math.max(1, Math.min(99, parseInt(number, 10) || 0)));
+
+      piece.name = name || "";
+      piece.number = number || "";
+      piece.replaceLabelWithNumber = !!replaceTextCheckboxEl.checked;
+
+      closeEditor();
+      commit();
+    }
+
+    function showNameTooltip(piece, clientX, clientY) {
+      if (!piece.name) return;
+      nameTooltipEl.style.display = "block";
+      nameTooltipEl.textContent = piece.name;
+      nameTooltipEl.style.background = piece.team === "red"
+        ? "linear-gradient(135deg, var(--red-a), var(--red-b))"
+        : "linear-gradient(135deg, var(--blue-a), var(--blue-b))";
+
+      const x = Math.min(window.innerWidth - nameTooltipEl.offsetWidth - 12, clientX + 14);
+      const y = Math.min(window.innerHeight - 40, clientY - 10);
+      nameTooltipEl.style.left = x + "px";
+      nameTooltipEl.style.top = y + "px";
+    }
+
+    function hideNameTooltip() {
+      nameTooltipEl.style.display = "none";
+    }
+
+    function getPieceViewportCenter(piece) {
+      const { rect } = getMetrics();
+      const p = pieceCenter(piece);
+      return { x: rect.left + p.x, y: rect.top + p.y };
+    }
+
+    function applyPreset(team, presetName) {
+      closeEditor();
+
+      const placements = PRESETS[state.format][presetName];
+      const keepPieces = state.pieces.filter(p => p.team !== team);
+      const removedIds = state.pieces.filter(p => p.team === team).map(p => p.id);
+
+      const newTeamPieces = placements.map(item => ({
+        id: "p" + state.nextPieceId++,
+        team,
+        label: item.label,
+        row: team === "red" ? item.row : (ROWS - 1 - item.row),
+        col: item.col,
+        slot: item.slot || "c",
+        name: "",
+        number: "",
+        replaceLabelWithNumber: false
+      }));
+
+      state.pieces = [...keepPieces, ...newTeamPieces];
+
+      if (removedIds.includes(state.selectedPieceId)) {
+        state.selectedPieceId = null;
+      }
+
+      if (state.ball.mode === "attached" && removedIds.includes(state.ball.pieceId)) {
+        state.ball = { mode: "off", row: null, col: null, anchor: null, pieceId: null, hold: null };
+      }
+
+      commit();
+    }
+
+    function updatePieceHover(clientX, clientY, ignorePieceId = null) {
+      ui.hoverCell = pointToCell(clientX, clientY);
+      ui.hoverAnchor = null;
+
+      if (!ui.hoverCell) {
+        renderHover();
+        return null;
+      }
+
+      const slot = getNearestAvailablePieceSlot(ui.hoverCell.row, ui.hoverCell.col, clientX, clientY, ignorePieceId);
+      if (!slot) {
+        renderHover();
+        return null;
+      }
+
+      const center = squareCenter(ui.hoverCell.row, ui.hoverCell.col);
+      ui.hoverAnchor = { x: center.x + slot.dx, y: center.y + slot.dy };
+      renderHover();
+      return { row: ui.hoverCell.row, col: ui.hoverCell.col, slot };
+    }
+
+    function updateBallHover(clientX, clientY) {
+      ui.hoverCell = pointToCell(clientX, clientY);
+      ui.hoverAnchor = null;
+
+      if (!ui.hoverCell) {
+        renderHover();
+        return null;
+      }
+
+      const piece = getNearestPieceInSquare(ui.hoverCell.row, ui.hoverCell.col, clientX, clientY);
+      if (piece) {
+        const hold = getNearestHoldAnchor(piece, clientX, clientY);
+        const pCenter = pieceCenter(piece);
+        ui.hoverAnchor = { x: pCenter.x + hold.dx, y: pCenter.y + hold.dy };
+        renderHover();
+        return { mode: "attached", piece, hold };
+      }
+
+      const anchor = getNearestFreeBallAnchor(ui.hoverCell.row, ui.hoverCell.col, clientX, clientY);
+      if (!anchor) {
+        renderHover();
+        return null;
+      }
+
+      const center = squareCenter(ui.hoverCell.row, ui.hoverCell.col);
+      ui.hoverAnchor = { x: center.x + anchor.dx, y: center.y + anchor.dy };
+      renderHover();
+      return { mode: "free", row: ui.hoverCell.row, col: ui.hoverCell.col, anchor };
+    }
+
+    function placeTemplateAt(clientX, clientY, team, label) {
+      const cell = pointToCell(clientX, clientY);
+      if (!cell) return false;
+      if (teamCount(team) >= 11) return false;
+
+      const slot = getNearestAvailablePieceSlot(cell.row, cell.col, clientX, clientY);
+      if (!slot) return false;
+
+      const newPiece = {
+        id: "p" + state.nextPieceId++,
+        team,
+        label,
+        row: cell.row,
+        col: cell.col,
+        slot: slot.id,
+        name: "",
+        number: "",
+        replaceLabelWithNumber: false
+      };
+
+      state.pieces.push(newPiece);
+      state.selectedPieceId = newPiece.id;
+      commit();
+      return true;
+    }
+
+    function movePieceTo(clientX, clientY, pieceId) {
+      const piece = getPiece(pieceId);
+      if (!piece) return false;
+
+      const cell = pointToCell(clientX, clientY);
+      if (!cell) {
+        state.pieces = state.pieces.filter(p => p.id !== piece.id);
+        if (state.ball.mode === "attached" && state.ball.pieceId === piece.id) {
+          state.ball = { mode: "off", row: null, col: null, anchor: null, pieceId: null, hold: null };
+        }
+        if (state.selectedPieceId === piece.id) state.selectedPieceId = null;
+        commit();
+        return true;
+      }
+
+      const slot = getNearestAvailablePieceSlot(cell.row, cell.col, clientX, clientY, piece.id);
+      if (!slot) return false;
+
+      const changed = piece.row !== cell.row || piece.col !== cell.col || piece.slot !== slot.id;
+      if (!changed) return false;
+
+      piece.row = cell.row;
+      piece.col = cell.col;
+      piece.slot = slot.id;
+      state.selectedPieceId = piece.id;
+      commit();
+      return true;
+    }
+
+    function placeBallAt(clientX, clientY) {
+      const cell = pointToCell(clientX, clientY);
+      if (!cell) {
+        state.ball = { mode: "off", row: null, col: null, anchor: null, pieceId: null, hold: null };
+        commit();
+        return true;
+      }
+
+      const piece = getNearestPieceInSquare(cell.row, cell.col, clientX, clientY);
+      if (piece) {
+        const hold = getNearestHoldAnchor(piece, clientX, clientY);
+        state.ball = {
+          mode: "attached",
+          pieceId: piece.id,
+          hold: hold.id,
+          row: null,
+          col: null,
+          anchor: null
+        };
+        commit();
+        return true;
+      }
+
+      const anchor = getNearestFreeBallAnchor(cell.row, cell.col, clientX, clientY);
+      if (!anchor) return false;
+
+      state.ball = {
+        mode: "free",
+        row: cell.row,
+        col: cell.col,
+        anchor: anchor.id,
+        pieceId: null,
+        hold: null
+      };
+      commit();
+      return true;
+    }
+
+    function startTempArrowFromPiece(pieceId) {
+      const piece = getPiece(pieceId);
+      if (!piece) return;
+      const c = pieceCenter(piece);
+      ui.pendingArrowStart = normalizePoint(c.x, c.y);
+      render();
+    }
+
+    function commitArrowToPoint(clientX, clientY) {
+      const cell = pointToCell(clientX, clientY);
+      let target;
+
+      if (cell) {
+        const piece = getNearestPieceInSquare(cell.row, cell.col, clientX, clientY);
+        if (piece) {
+          const c = pieceCenter(piece);
+          target = normalizePoint(c.x, c.y);
+        } else {
+          target = normalizePoint(cell.x, cell.y);
+        }
+      } else {
+        const fp = fieldPointFromClient(clientX, clientY);
+        const { rect } = getMetrics();
+        const clampedX = Math.max(0, Math.min(rect.width, fp.x));
+        const clampedY = Math.max(0, Math.min(rect.height, fp.y));
+        target = normalizePoint(clampedX, clampedY);
+      }
+
+      if (!ui.pendingArrowStart || !target) return false;
+
+      const start = denormalizePoint(ui.pendingArrowStart.x, ui.pendingArrowStart.y);
+      const end = denormalizePoint(target.x, target.y);
+      const len = Math.hypot(end.x - start.x, end.y - start.y);
+      if (len < 10) {
+        ui.pendingArrowStart = null;
+        render();
+        return false;
+      }
+
+      state.arrows.push({
+        id: "a" + state.nextArrowId++,
+        start: snapshot(ui.pendingArrowStart),
+        end: snapshot(target)
+      });
+      ui.pendingArrowStart = null;
+      commit();
+      return true;
+    }
+
+    function handlePieceTap(piece, clientX, clientY) {
+      closeEditor();
+
+      if (ui.armedBall) {
+        const hold = getNearestHoldAnchor(piece, clientX, clientY);
+        state.ball = {
+          mode: "attached",
+          pieceId: piece.id,
+          hold: hold.id,
+          row: null,
+          col: null,
+          anchor: null
+        };
+        ui.armedBall = false;
+        commit();
+        return;
+      }
+
+      if (ui.arrowMode) {
+        if (!ui.pendingArrowStart) {
+          startTempArrowFromPiece(piece.id);
+        } else {
+          const c = pieceCenter(piece);
+          const target = normalizePoint(c.x, c.y);
+          const start = denormalizePoint(ui.pendingArrowStart.x, ui.pendingArrowStart.y);
+          const end = denormalizePoint(target.x, target.y);
+          if (Math.hypot(end.x - start.x, end.y - start.y) >= 10) {
+            state.arrows.push({
+              id: "a" + state.nextArrowId++,
+              start: snapshot(ui.pendingArrowStart),
+              end: snapshot(target)
+            });
+            ui.pendingArrowStart = null;
+            commit();
+          } else {
+            ui.pendingArrowStart = null;
+            render();
+          }
+        }
+        return;
+      }
+
+      if (isTouchContext()) {
+        const now = Date.now();
+        if (ui.lastPieceTap.id === piece.id && now - ui.lastPieceTap.time < 350) {
+          const p = getPieceViewportCenter(piece);
+          openEditorForPiece(piece, p.x, p.y);
+          ui.lastPieceTap = { id: null, time: 0 };
+          return;
+        }
+        ui.lastPieceTap = { id: piece.id, time: now };
+      }
+
+      state.selectedPieceId = piece.id;
+      render();
+    }
+
+    function showRightClickEditorIfNeeded(pieceId, clientX, clientY) {
+      const now = Date.now();
+      if (ui.lastRightClick.id === pieceId && now - ui.lastRightClick.time < 400) {
+        const piece = getPiece(pieceId);
+        if (piece) openEditorForPiece(piece, clientX, clientY);
+        ui.lastRightClick = { id: null, time: 0 };
+      } else {
+        ui.lastRightClick = { id: pieceId, time: now };
+      }
+    }
+
+    function onMouseMove(e) {
+      ui.lastPointer = { x: e.clientX, y: e.clientY };
+      if (!ui.drag) return;
+
+      const dx = e.clientX - ui.drag.startX;
+      const dy = e.clientY - ui.drag.startY;
+      const movedEnough = Math.hypot(dx, dy) > 6;
+
+      if ((ui.drag.type === "template" || ui.drag.type === "piece-left" || ui.drag.type === "ball") && movedEnough && !ui.drag.moved) {
+        ui.drag.moved = true;
+
+        if (ui.drag.type === "template") {
+          ui.dragGhost = makePieceGhost(ui.drag.team, ui.drag.label);
+        } else if (ui.drag.type === "piece-left") {
+          const piece = getPiece(ui.drag.pieceId);
+          if (!piece) return;
+          ui.dragGhost = makePieceGhost(piece.team, piece.label, piece.number, piece.replaceLabelWithNumber);
+        } else if (ui.drag.type === "ball") {
+          ui.dragGhost = makeBallGhost();
+        }
+      }
+
+      if (ui.drag.type === "piece-right" && movedEnough && !ui.drag.moved) {
+        ui.drag.moved = true;
+        const piece = getPiece(ui.drag.pieceId);
+        if (!piece) return;
+        const c = pieceCenter(piece);
+        ui.tempArrow = {
+          start: normalizePoint(c.x, c.y),
+          end: normalizePoint(c.x, c.y)
+        };
+      }
+
+      if (ui.dragGhost) moveGhost(e.clientX, e.clientY);
+
+      if (ui.drag.type === "template" && ui.drag.moved) {
+        const target = updatePieceHover(e.clientX, e.clientY);
+        const valid = target && teamCount(ui.drag.team) < 11;
+        if (ui.dragGhost) ui.dragGhost.classList.toggle("ghost-invalid", !valid);
+      } else if (ui.drag.type === "piece-left" && ui.drag.moved) {
+        const cell = pointToCell(e.clientX, e.clientY);
+        const target = cell ? updatePieceHover(e.clientX, e.clientY, ui.drag.pieceId) : null;
+        const valid = !cell || !!target;
+        if (ui.dragGhost) ui.dragGhost.classList.toggle("ghost-invalid", !valid);
+      } else if (ui.drag.type === "ball" && ui.drag.moved) {
+        updateBallHover(e.clientX, e.clientY);
+        if (ui.dragGhost) ui.dragGhost.classList.remove("ghost-invalid");
+      } else if (ui.drag.type === "piece-right" && ui.drag.moved && ui.tempArrow) {
+        const cell = pointToCell(e.clientX, e.clientY);
+        const fp = cell ? { x: cell.x, y: cell.y } : fieldPointFromClient(e.clientX, e.clientY);
+        const { rect } = getMetrics();
+        const clampedX = Math.max(0, Math.min(rect.width, fp.x));
+        const clampedY = Math.max(0, Math.min(rect.height, fp.y));
+        ui.tempArrow.end = normalizePoint(clampedX, clampedY);
+        renderArrows();
+      }
+    }
+
+    function onMouseUp(e) {
+      window.removeEventListener("mousemove", onMouseMove);
+      if (!ui.drag) return;
+
+      if (ui.drag.type === "template") {
+        if (ui.drag.moved) {
+          const placed = placeTemplateAt(e.clientX, e.clientY, ui.drag.team, ui.drag.label);
+          ui.suppressClicksUntil = Date.now() + 140;
+          if (!placed) render();
+        }
+      }
+
+      if (ui.drag.type === "piece-left") {
+        if (ui.drag.moved) {
+          movePieceTo(e.clientX, e.clientY, ui.drag.pieceId);
+          ui.suppressClicksUntil = Date.now() + 140;
+        }
+      }
+
+      if (ui.drag.type === "ball") {
+        if (ui.drag.moved) {
+          placeBallAt(e.clientX, e.clientY);
+          ui.suppressClicksUntil = Date.now() + 140;
+        }
+      }
+
+      if (ui.drag.type === "piece-right") {
+        if (ui.drag.moved && ui.tempArrow) {
+          const endCell = pointToCell(e.clientX, e.clientY);
+          const fp = endCell ? { x: endCell.x, y: endCell.y } : fieldPointFromClient(e.clientX, e.clientY);
+          const { rect } = getMetrics();
+          const clampedX = Math.max(0, Math.min(rect.width, fp.x));
+          const clampedY = Math.max(0, Math.min(rect.height, fp.y));
+          ui.tempArrow.end = normalizePoint(clampedX, clampedY);
+
+          const start = denormalizePoint(ui.tempArrow.start.x, ui.tempArrow.start.y);
+          const end = denormalizePoint(ui.tempArrow.end.x, ui.tempArrow.end.y);
+          if (Math.hypot(end.x - start.x, end.y - start.y) >= 10) {
+            state.arrows.push({
+              id: "a" + state.nextArrowId++,
+              start: snapshot(ui.tempArrow.start),
+              end: snapshot(ui.tempArrow.end)
+            });
+            commit();
+          } else {
+            render();
+          }
+          ui.suppressClicksUntil = Date.now() + 140;
+        } else {
+          showRightClickEditorIfNeeded(ui.drag.pieceId, e.clientX, e.clientY);
+        }
+      }
+
+      cleanupDrag();
+    }
+
+    function handleFieldClick(e) {
+      if (Date.now() < ui.suppressClicksUntil) return;
+      closeEditor();
+
+      const clientX = e.clientX;
+      const clientY = e.clientY;
+
+      if (ui.arrowMode) {
+        if (ui.pendingArrowStart) {
+          commitArrowToPoint(clientX, clientY);
+        }
+        return;
+      }
+
+      if (ui.armedBall) {
+        if (placeBallAt(clientX, clientY)) {
+          ui.armedBall = false;
+          render();
+        }
+        return;
+      }
+
+      if (ui.armedTemplate) {
+        if (placeTemplateAt(clientX, clientY, ui.armedTemplate.team, ui.armedTemplate.label)) {
+          ui.armedTemplate = null;
+          render();
+        }
+        return;
+      }
+
+      if (state.selectedPieceId) {
+        const moved = movePieceTo(clientX, clientY, state.selectedPieceId);
+        if (moved) return;
+      }
+
+      const cell = pointToCell(clientX, clientY);
+      if (!cell) {
+        state.selectedPieceId = null;
+        render();
+        return;
+      }
+
+      const piece = getNearestPieceInSquare(cell.row, cell.col, clientX, clientY);
+      state.selectedPieceId = piece ? piece.id : null;
+      render();
+    }
+
+    function ballHomeClick() {
+      closeEditor();
+      ui.armedTemplate = null;
+      ui.pendingArrowStart = null;
+      ui.arrowMode = false;
+      ui.armedBall = !ui.armedBall;
+      render();
+    }
+
+    function clearArmed() {
+      ui.armedTemplate = null;
+      ui.armedBall = false;
+      ui.pendingArrowStart = null;
+      ui.arrowMode = false;
+      render();
+    }
+
+    function undo() {
+      if (historyIndex === 0) return;
+      historyIndex--;
+      restoreFrom(history[historyIndex]);
+    }
+
+    function redo() {
+      if (historyIndex >= history.length - 1) return;
+      historyIndex++;
+      restoreFrom(history[historyIndex]);
+    }
+
+    function resetSandbox() {
+      state = makeInitialState();
+      history = [snapshot(state)];
+      historyIndex = 0;
+      ui.armedTemplate = null;
+      ui.armedBall = false;
+      ui.arrowMode = false;
+      ui.pendingArrowStart = null;
+      ui.lastPieceTap = { id: null, time: 0 };
+      ui.lastRightClick = { id: null, time: 0 };
+      closeEditor();
+      cleanupDrag();
+    }
+
+    fieldEl.addEventListener("click", handleFieldClick);
+
+    ballHomeEl.addEventListener("click", () => {
+      if (Date.now() < ui.suppressClicksUntil) return;
+      ballHomeClick();
+    });
+
+    ballHomeEl.addEventListener("mousedown", e => {
+      if (e.button !== 0) return;
+      ui.drag = {
+        type: "ball",
+        startX: e.clientX,
+        startY: e.clientY,
+        moved: false
+      };
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp, { once: true });
+    });
+
+    document.addEventListener("touchstart", () => {
+      ui.recentTouchUntil = Date.now() + 700;
+    }, { passive: true });
+
+    document.addEventListener("pointermove", e => {
+      ui.lastPointer = { x: e.clientX, y: e.clientY };
+    });
+
+    undoBtn.addEventListener("click", undo);
+    redoBtn.addEventListener("click", redo);
+
+    editSelectedBtn.addEventListener("click", () => {
+      const piece = state.selectedPieceId ? getPiece(state.selectedPieceId) : null;
+      if (!piece) return;
+      const pos = getPieceViewportCenter(piece);
+      openEditorForPiece(piece, pos.x, pos.y);
+    });
+
+    clearSelectionBtn.addEventListener("click", () => {
+      state.selectedPieceId = null;
+      render();
+    });
+
+    clearArmedBtn.addEventListener("click", clearArmed);
+
+    clearArrowsBtn.addEventListener("click", () => {
+      if (!state.arrows.length) return;
+      state.arrows = [];
+      ui.pendingArrowStart = null;
+      commit();
+    });
+
+    arrowModeBtn.addEventListener("click", () => {
+      closeEditor();
+      ui.armedTemplate = null;
+      ui.armedBall = false;
+      ui.arrowMode = !ui.arrowMode;
+      if (!ui.arrowMode) ui.pendingArrowStart = null;
+      render();
+    });
+
+    resetBtn.addEventListener("click", resetSandbox);
+
+    saveEditorBtn.addEventListener("click", saveEditor);
+    closeEditorBtn.addEventListener("click", closeEditor);
+
+    window.addEventListener("keydown", e => {
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+
+      if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+
+      if ((mod && e.key.toLowerCase() === "y") || (mod && e.shiftKey && e.key.toLowerCase() === "z")) {
+        e.preventDefault();
+        redo();
+      }
+
+      if (e.key === "Escape") {
+        closeEditor();
+        ui.pendingArrowStart = null;
+        ui.arrowMode = false;
+        ui.armedTemplate = null;
+        ui.armedBall = false;
+        render();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      render();
+    });
+
+    createGrid();
+    render();
+  </script>
+</body>
+</html>
+
